@@ -1,86 +1,118 @@
 const express = require('express');
-const mustache = require('mustache-express');
-const bodyParser = require('body-parser');
 const session = require('express-session');
-const fs = require('fs');
-const data = fs.readFileSync("/usr/share/dict/words", "utf-8").toLowerCase().split("\n");
+const mustache = require('mustache-express');
+const body = require('body-parser');
 const port = 3000;
 const app = express();
+const fs = require('fs');
+const words = fs.readFileSync("/usr/share/dict/words", "utf-8").toLowerCase().split("\n");
 
+//start the engine, set the views, and use body-parser
 app.engine('mustache', mustache());
 app.set('views', './views');
 app.set('view engine', 'mustache');
+app.use(body.json());
+app.use(body.urlencoded({
+ extended: false
+}));
 app.use(express.static(__dirname + '/public'));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({extended: false}));
 
-let randomWord = data[Math.floor(Math.random() * data.length)];
-//thanks Nancy for ... operator to split string
-let activeWord = [...randomWord];
+//variables for usage in the game
+let gameLose;
+let gameWin;
+let randomWord = words[Math.floor(Math.random() * words.length)];
+let wordToPlay = [...randomWord];
 let hiddenWord = [...randomWord];
-let shownWord = hiddenWord.fill('');
+let wordDisplay = hiddenWord.fill('');
 let lettersGuessed = [];
 let correctWords = [];
-let guessesLeft = 8;
-let correctGuess = 0;
+let count = 8;
+let score = 0;
+let nextWord = [];
 
-
-
-
+//setting up a session for each request to the page
 app.use(session({
  secret: 'biskits',
  resave: false,
  saveUninitalized: true
 }));
 
-app.get('/', function(req, res){
- res.render('index', {activeWord, shownWord, guessesLeft});
+//sets up the inital load of the page
+app.get('/', function(req, res) {
+ res.render('index', {
+  wordToPlay,
+  wordDisplay,
+  count,
+  score
+ });
  req.session.word = randomWord;
+ console.log(randomWord);
 });
 
-app.post('/', function(req, res){
-  let guess = req.body.guess_box.toLowerCase();
-  checkWord(guess);
-  res.render('index', {activeWord, shownWord, lettersGuessed, guessesLeft, correctWords});
+//posts submissions from the guess form
+//contains checkWord function to check
+//the guess input against the mystery word
+app.post('/', function(req, res) {
+ let guess = req.body.guess.toLowerCase();
+ checkWord(guess);
+ res.render('index', {
+  wordToPlay,
+  wordDisplay,
+  lettersGuessed,
+  count,
+  gameLose,
+  gameWin,
+  correctWords,
+  score,
+  nextWord
+ });
+ gameWon();
+})
 
-});
-
-function gameOver() {
-//working on losing
-  count = "0"
-};
-
-function gameWon() {
-    if (!shownWord.includes('')) {
-  //working on winning
-      count = 8;
-    }
-  };
-
+//listens for port 3000 on local host
+app.listen(port);
 
 
 function checkWord(guess) {
-  if (activeWord.includes(guess)) {
-      correctGuess++;
-      let match = activeWord.indexOf(guess);
-      //~ (Bitwise NOT)
-      //Bitwise NOTing any number x yields -(x + 1).
-      while (~match) {
-      hiddenWord[match] = guess;
-      match = activeWord.indexOf(guess, match + 1);
-    }
+ if (wordToPlay.includes(guess)) {
+  score++;
+  let correctGuess = wordToPlay.indexOf(guess);
+  while (~correctGuess) {
+   hiddenWord[correctGuess] = guess;
+   correctGuess = wordToPlay.indexOf(guess, correctGuess + 1);
+  }
  } else {
-   lettersGuessed.push(guess);
-   if (guessesLeft > 1) {
-    guessesLeft--;
-   }
-   else {
-    gameOver();
-   }
+  lettersGuessed.push(guess);
+  if (count > 1) {
+   count--;
+  } else {
+   gameOver();
+  }
  }
 }
 
+function gameOver() {
+ gameWin = [];
+ gameLose = "You've lost!"
+ count = "0"
+}
 
-app.listen(port, function(req, res){
- console.log('Starting express-session login app...');
-});
+function gameWon() {
+ if (!wordDisplay.includes('')) {
+  generateNextWord();
+  gameWin = "Nice work! Keep going!"
+  count = 8;
+ }
+}
+
+function generateNextWord() {
+ nextWord = "Next Word!"
+ correctWords.push(randomWord);
+ randomWord = [];
+ randomWord = words[Math.floor(Math.random() * words.length)];
+ wordToPlay = [...randomWord];
+ hiddenWord = [...randomWord];
+ wordDisplay = hiddenWord.fill('');
+ lettersGuessed = [];
+ gameWin = [];
+}
