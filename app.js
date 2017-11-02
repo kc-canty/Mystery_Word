@@ -32,7 +32,7 @@ let nextWord = [];
 
 //setting up a session for each request to the page
 app.use(session({
- secret: 'wool socks',
+ secret: 'biskits',
  resave: false,
  saveUninitalized: true
 }));
